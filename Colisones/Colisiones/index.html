@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+        <title>Babylon.js sample code</title>
+
+        <!-- Babylon.js -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.6.2/dat.gui.min.js"></script>
+        <script src="https://assets.babylonjs.com/generated/Assets.js"></script>
+        <script src="https://preview.babylonjs.com/ammo.js"></script>
+        <script src="https://preview.babylonjs.com/cannon.js"></script>
+        <script src="https://preview.babylonjs.com/Oimo.js"></script>
+        <script src="https://preview.babylonjs.com/earcut.min.js"></script>
+        <script src="https://preview.babylonjs.com/babylon.js"></script>
+        <script src="https://preview.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+        <script src="https://preview.babylonjs.com/proceduralTexturesLibrary/babylonjs.proceduralTextures.min.js"></script>
+        <script src="https://preview.babylonjs.com/postProcessesLibrary/babylonjs.postProcess.min.js"></script>
+        <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.js"></script>
+        <script src="https://preview.babylonjs.com/serializers/babylonjs.serializers.min.js"></script>
+        <script src="https://preview.babylonjs.com/gui/babylon.gui.min.js"></script>
+        <script src="https://preview.babylonjs.com/inspector/babylon.inspector.bundle.js"></script>
+
+        <style>
+            html, body {
+                overflow: hidden;
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+
+            #renderCanvas {
+                width: 100%;
+                height: 100%;
+                touch-action: none;
+            }
+        </style>
+    </head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <script>
+        var canvas = document.getElementById("renderCanvas");
+
+        var startRenderLoop = function (engine, canvas) {
+            engine.runRenderLoop(function () {
+                if (sceneToRender && sceneToRender.activeCamera) {
+                    sceneToRender.render();
+                }
+            });
+        }
+
+        var engine = null;
+        var scene = null;
+        var sceneToRender = null;
+        var createDefaultEngine = function() { return new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true,  disableWebGL2Support: false}); };
+        var createScene = function() {
+        	var scene = new BABYLON.Scene(engine);
+        	var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI/2, Math.PI / 2, 600, BABYLON.Vector3.Zero(), scene);
+        	camera.attachControl(canvas, true);
+        
+            var light = new BABYLON.HemisphericLight('light1', new BABYLON.Vector3(0, 1, 0), scene);
+            light.intensity = 0.2;
+            var pl = new BABYLON.PointLight('pl', camera.position, scene);
+            pl.intensity = 0.3;
+        
+            //Materials
+        	var redmat = new BABYLON.StandardMaterial("", scene);
+        	redmat.diffuseColor = new BABYLON.Color3(0, 0.88, 1);
+        	
+        	var brownmat = new BABYLON.StandardMaterial("", scene);
+        	brownmat.diffuseColor = new BABYLON.Color3(0.04, 0.38, 0.6);
+        	
+        	
+        	//walls
+        	var wallLeft = BABYLON.MeshBuilder.CreatePlane("wallLeft", {width:100, height:300}, scene);
+        	wallLeft.rotation.y = -Math.PI/2;
+        	wallLeft.position.x = -200;
+        	wallLeft.material = brownmat
+        	
+        	var wallRight = BABYLON.MeshBuilder.CreatePlane("wallRight", {width:100, height:300}, scene);
+        	wallRight.rotation.y = Math.PI/2;
+        	wallRight.position.x = 200;
+        	wallRight.material = brownmat
+        	
+        	
+        	var radius1 = 6;
+        	var radius2 = 6;
+        	var radius3 = 6;
+        	
+        	var speed1 = 2 * radius1 + 5;
+        	var speed2 = 2 * radius2 + 5;
+        	var speed3 = 2 * radius3 + 5;
+        	
+        	var positionX1 = Math.floor(150 + 50 * Math.random());
+        	var positionX2 = Math.floor(150 + 50 * Math.random());
+        	var positionX3 = Math.floor(150 + 50 * Math.random());
+        	
+        
+        	positionX1 = wallLeft.position.x + speed1 * Math.floor(positionX1/speed1) + radius1;
+        	positionX2 = wallLeft.position.x + speed2 * Math.floor(positionX2/speed2) + radius2;
+        	positionX3 = wallLeft.position.x + speed3 * Math.floor(positionX3/speed3) + radius3;
+        	
+        	
+        	positionX1 += Math.floor((speed1 - 2 * radius1 -1) * Math.random()) + 1;
+        	
+        	//Add a non-zero integer value of d > v -2r to positionX3 so that the sphere will partly penetrate the walls before rebounding
+        	positionX3 += Math.floor(2 * radius3 * Math.random() + speed3 - 2 * radius3);
+        	
+        	//Re-position the right wall so that sphere2 will just touch it before rebounding.
+        	var rightDiff = wallRight.position.x - positionX2 ;
+        	var rightMult = Math.floor(rightDiff/speed2);
+        	wallRight.position.x = positionX2 + rightMult * speed2 + radius2;
+        	
+        	//Spheres
+        	
+        	
+        	var sphere3 = BABYLON.MeshBuilder.CreateSphere('sphere3',{diameter: 2 * radius3, segments:8}, scene);
+        	sphere3.material = redmat;
+        	sphere3.position.x = positionX3;
+        	sphere3.position.y = -50;
+        	sphere3.velocity = new BABYLON.Vector3(-1, 0, 0).scaleInPlace(speed3);
+        	var startVelocity3 = new BABYLON.Vector3(-1, 0, 0).scaleInPlace(speed3);
+        	
+        	//animation
+        	scene.registerAfterRender(function() {	
+        		
+        		if(sphere3.position.length() < 250) {
+        			if(sphere3.intersectsMesh(wallLeft, true) && sphere3.velocity.equals(startVelocity3) || sphere3.intersectsMesh(wallRight, true) && sphere3.velocity.equals(startVelocity3.scale(-1))) {
+        			sphere3.velocity.scaleInPlace(-1);
+        			}
+        			sphere3.position.addInPlace(sphere3.velocity);
+        		}
+        		
+        	})
+        	
+        	return scene;
+        };
+                window.initFunction = async function() {
+                    
+                    
+                    var asyncEngineCreation = async function() {
+                        try {
+                        return createDefaultEngine();
+                        } catch(e) {
+                        console.log("the available createEngine function failed. Creating the default engine instead");
+                        return createDefaultEngine();
+                        }
+                    }
+
+                    window.engine = await asyncEngineCreation();
+        if (!engine) throw 'engine should not be null.';
+        startRenderLoop(engine, canvas);
+        window.scene = createScene();};
+        initFunction().then(() => {sceneToRender = scene                    
+        });
+
+        // Resize
+        window.addEventListener("resize", function () {
+            engine.resize();
+        });
+    </script>
+</body>
+</html>

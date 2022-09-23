@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+        <title>Babylon.js sample code</title>
+
+        <!-- Babylon.js -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.6.2/dat.gui.min.js"></script>
+        <script src="https://assets.babylonjs.com/generated/Assets.js"></script>
+        <script src="https://preview.babylonjs.com/ammo.js"></script>
+        <script src="https://preview.babylonjs.com/cannon.js"></script>
+        <script src="https://preview.babylonjs.com/Oimo.js"></script>
+        <script src="https://preview.babylonjs.com/earcut.min.js"></script>
+        <script src="https://preview.babylonjs.com/babylon.js"></script>
+        <script src="https://preview.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+        <script src="https://preview.babylonjs.com/proceduralTexturesLibrary/babylonjs.proceduralTextures.min.js"></script>
+        <script src="https://preview.babylonjs.com/postProcessesLibrary/babylonjs.postProcess.min.js"></script>
+        <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.js"></script>
+        <script src="https://preview.babylonjs.com/serializers/babylonjs.serializers.min.js"></script>
+        <script src="https://preview.babylonjs.com/gui/babylon.gui.min.js"></script>
+        <script src="https://preview.babylonjs.com/inspector/babylon.inspector.bundle.js"></script>
+
+        <style>
+            html, body {
+                overflow: hidden;
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+
+            #renderCanvas {
+                width: 100%;
+                height: 100%;
+                touch-action: none;
+            }
+        </style>
+    </head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <script>
+        var canvas = document.getElementById("renderCanvas");
+
+        var startRenderLoop = function (engine, canvas) {
+            engine.runRenderLoop(function () {
+                if (sceneToRender && sceneToRender.activeCamera) {
+                    sceneToRender.render();
+                }
+            });
+        }
+
+        var engine = null;
+        var scene = null;
+        var sceneToRender = null;
+        var createDefaultEngine = function() { return new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true,  disableWebGL2Support: false}); };
+        var createScene = function() {
+        	var scene = new BABYLON.Scene(engine);
+        	var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI/2, Math.PI / 2, 200, BABYLON.Vector3.Zero(), scene);
+        	camera.attachControl(canvas, true);
+        
+            var light = new BABYLON.HemisphericLight('light1', new BABYLON.Vector3(0, 1, 0), scene);
+            light.intensity = 0.2;
+            var pl = new BABYLON.PointLight('pl', camera.position, scene);
+            pl.intensity = 0.3;
+        
+            //Base particle
+            var particleRadius = 6;
+        	var particle = BABYLON.MeshBuilder.CreateSphere('particle',{diameter: 2 * particleRadius, segments:8}, scene);
+        	var sphere = BABYLON.MeshBuilder.CreateSphere('sphere',{diameter: 2 * particleRadius, segments:8}, scene);
+        	
+        	var redmat = new BABYLON.StandardMaterial("", scene);
+        	redmat.diffuseColor = new BABYLON.Color3(1, 0, 0.75);
+        	
+        	var greenmat = new BABYLON.StandardMaterial("", scene);
+        	greenmat.diffuseColor = new BABYLON.Color3(0, 1, 0);
+        	
+        	var redmatlight = new BABYLON.StandardMaterial("", scene);
+        	redmatlight.diffuseColor = new BABYLON.Color3(0, 0.85, 1);
+        	redmatlight.alpha = 0.2;
+        	
+        	var greenmatlight = new BABYLON.StandardMaterial("", scene);
+        	greenmatlight.diffuseColor = new BABYLON.Color3(0.73, 1, 0);
+        	
+        	var mat = new BABYLON.StandardMaterial("", scene);
+        	
+        	particle.material = redmat;
+        	sphere.material = greenmat;
+        	greenmatlight.alpha = 0.2;
+        	
+        	//perpendicular
+        	particle.position = new BABYLON.Vector3(-64, 0, 0);
+        	particle.velocity = new BABYLON.Vector3(8, 0, 0);
+        	sphere.position = new BABYLON.Vector3(0, -40, 0);
+        	sphere.velocity = new BABYLON.Vector3(0, 5, 0);
+        
+           
+        	
+        	
+        	//CURRENT POSITION
+        	var dx = 0; 
+        	var dy = 0; 
+        	var dz = 0; 
+            var dx2 = 0;
+        	var dy2 = 0; 
+        	var dz2 = 0; 
+        	var dl = 0; 
+        	var dl2 = 0; 
+        	var nx = 0; 
+        	var ny = 0; 
+        	var nz = 0; 
+        	
+        	
+        	
+        	var vx = 0; 
+        	var vy = 0; 
+        	var vz = 0; 
+        	var vx2 = 0; 
+        	var vy2 = 0; 
+        	var vz2 = 0; 
+        	var vl2 = 0; 
+        	var vdotd = 0; 
+        	
+        	var sq = 0; // quadratic b^2 - 4ac
+        	var sqroot = 0; // root of b^2 - 4ac
+        	var t =0; //time to collision
+        	
+        	var shapeVelocity = function(particle, sphere) {	
+        		dx = particle.position.x - sphere.position.x;
+        		dy = particle.position.y - sphere.position.y;
+        		dz = particle.position.z - sphere.position.z;
+        		dx2 = dx * dx;
+        		dy2 = dy * dy;
+        		dz2 = dz * dz;
+        		dl2 = dx2 + dy2 + dz2;
+        		
+        		vx = particle.velocity.x - sphere.velocity.x;
+        		vy = particle.velocity.y - sphere.velocity.y;
+        		vz = particle.velocity.z - sphere.velocity.z;
+        		vx2 = vx * vx;
+        		vy2 = vy * vy;
+        		vz2 = vz * vz;
+        		vl2 = vx2 + vy2 + vz2;
+        		
+        		vdotd = dx * vx + dy * vy + dz * vz;
+        		
+        		sq = 4 * vdotd * vdotd - 4 * vl2 * (dl2 - 4 * particleRadius * particleRadius);
+        		
+        		if(vdotd < 0 && sq >0) {
+        			sqroot = Math.sqrt(sq);
+        			t = (-2 * vdotd - sqroot)/(2 * vl2);
+        			if(0 < t && t <= 1 ) {
+        				
+        				//new velocity
+        				dx += vx;
+        				dy += vy;
+        				dz += vz;
+        				dx2 = dx * dx;
+        				dy2 = dy * dy;
+        				dz2 = dz * dz;
+        				dl2 = dx2 + dy2 + dz2;
+        				if(dl2 == 0) {
+        					dl2 = 1;
+        				}
+        				dl = Math.sqrt(dl2);
+        				nx = dx/dl;
+        				ny = dy/dl;
+        				nz = dz/dl;
+        				
+        				vdotn = nx * vx + ny * vy + nz * vz;
+        				
+        				particle.velocity.x -= vdotn * nx;
+        				particle.velocity.y -= vdotn * ny;
+        				particle.velocity.z -= vdotn * nz;
+        				sphere.velocity.x += vdotn * nx;
+        				sphere.velocity.y += vdotn * ny;
+        				sphere.velocity.z += vdotn * nz;
+        				
+        				//position correction
+        				particle.position.x += vdotn * nx * t;
+        				particle.position.y += vdotn * ny * t;
+        				particle.position.z += vdotn * nz * t;
+        				sphere.position.x -= vdotn * nx * t;
+        				sphere.position.y -= vdotn * ny * t;
+        				sphere.position.z -= vdotn * nz * t;
+        			
+        			}
+        		
+        		}
+        			
+        		
+        			
+        			
+        			
+        
+        	}
+        	var direction = BABYLON.Vector3.Zero();
+        	var skew = BABYLON.Vector3.Zero();
+        	
+        	var drawCyl = function(vstart, vend, radius, material) {
+        		vend.subtractToRef(vstart, direction);		
+        		direction.addToRef(new BABYLON.Vector3(Math.random() + 1, Math.random() + 1, Math.random() + 1), skew);
+        		var axisA = BABYLON.Vector3.Cross(direction, skew);
+        		
+        		var axisB = BABYLON.Vector3.Cross(direction, axisA);	
+        		axisA.normalize();
+        		axisB.normalize();
+        		var start = [];
+        		var end = [];
+        
+        		for(var theta = 0; theta<=2 * Math. PI; theta += Math.PI/12) {
+        			var point = axisA.scale(radius * Math.cos(theta)).add(axisB.scale(radius * Math.sin(theta)));
+        			point.addInPlace(vstart);
+        			start.push(point);
+        			end.push(point.add(direction));
+        		}
+        		
+        		
+        	} 
+        		xxx=0;
+        		scene.registerAfterRender(function() {
+        			if(xxx++ < 150) {
+        				shapeVelocity(particle, sphere);	
+        				particle.position.addInPlace(particle.velocity);
+        				sphere.position.addInPlace(sphere.velocity);				
+        
+        			}
+        		
+        		})
+        	
+        	return scene;
+        };
+                window.initFunction = async function() {
+                    
+                    
+                    var asyncEngineCreation = async function() {
+                        try {
+                        return createDefaultEngine();
+                        } catch(e) {
+                        console.log("the available createEngine function failed. Creating the default engine instead");
+                        return createDefaultEngine();
+                        }
+                    }
+
+                    window.engine = await asyncEngineCreation();
+        if (!engine) throw 'engine should not be null.';
+        startRenderLoop(engine, canvas);
+        window.scene = createScene();};
+        initFunction().then(() => {sceneToRender = scene                    
+        });
+
+        // Resize
+        window.addEventListener("resize", function () {
+            engine.resize();
+        });
+    </script>
+</body>
+</html>
